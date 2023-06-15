@@ -13,6 +13,8 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 CRDOC ?= $(LOCALBIN)/crdoc
+KIND ?= $(LOCALBIN)/kind
+CLUSTERCTL ?= $(LOCALBIN)/clusterctl
 
 # Image URL to use all building/pushing image targets
 IMG ?= quay.io/k0sproject/k0smotron:latest
@@ -163,13 +165,21 @@ release: manifests kustomize ## Deploy controller to the K8s cluster specified i
 	git checkout config/manager/kustomization.yaml
 ##@ Build Dependencies
 
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
+kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): Makefile.variables | $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
 
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): Makefile.variables | $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+
+kind: $(KIND) ## Download kind locally if necessary.
+$(KIND): Makefile.variables | $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind/cmd/kind@v$(KIND_VERSION)
+
+clusterctl: $(CLUSTERCTL) ## Download clusterctl locally if necessary.
+$(CLUSTERCTL): Makefile.variables | $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/cluster-api/cmd/clusterctl@v$(CLUSTERCTL_VERSION)
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
@@ -236,14 +246,14 @@ lint: hack/lint/.golangci-lint.stamp
 .PHONY: kind-cluster
 kind-cluster:
 	docker create network kind --opt com.docker.network.bridge.enable_ip_masquerade=true || true
-	kind create cluster --name k0smotron --config config/samples/capi/docker/kind.yaml
+	$(KIND) create cluster --name k0smotron --config config/samples/capi/docker/kind.yaml
 
 .PHONY: kind-deploy-capi
-	clusterctl init --infrastructure docker
+	$(CLUSTERCTL) init --infrastructure docker
 
 .PHONY: kind-deploy-k0smotron
 kind-deploy-k0smotron: release k0smotron-image-bundle.tar
-	kind load image-archive k0smotron-image-bundle.tar
+	$(KIND) load image-archive k0smotron-image-bundle.tar
 	kubectl apply -f install.yaml
-	kubectl rollout restart -n k0smotron deployment/k0smotron-controller-manager
+	$(CLUSTERCTL) rollout restart -n k0smotron deployment/k0smotron-controller-manager
 
