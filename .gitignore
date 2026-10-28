@@ -5,6 +5,7 @@ install-extension-webhook.yaml
 bootstrap-components.yaml
 control-plane-components.yaml
 infrastructure-components.yaml
+kind.conf
 
 # Binaries for programs and plugins
 *.exe
